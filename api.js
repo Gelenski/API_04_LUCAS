@@ -6,7 +6,7 @@ const functions = require("./inc/functions");
 const mysql_config = require("./inc/mysql_config");
 
 const API_AVAILABILITY = true;
-const API_VERSION = "3.0.0";
+const API_VERSION = "4.0.0";
 
 const app = express();
 
@@ -148,6 +148,55 @@ app.put("/tasks/create", (req, res) => {
           rows.affectedRows,
           null
         );
+      } else {
+        res.json(functions.response("Erro", err.message, 0, null));
+      }
+    }
+  );
+});
+
+app.put("/tasks/:id/update", (req, res) => {
+  const id = req.params.id;
+  const post_data = req.body;
+
+  if (post_data == undefined) {
+    res.json(
+      functions.response("Atenção", "Sem dados para uma nova task", 0, null)
+    );
+    return;
+  }
+  if (post_data == undefined || post_data.status == undefined) {
+    res.json(functions.response("Atenção", "Dados Inválidos", 0, null));
+    return;
+  }
+
+  const task = post_data.task;
+  const status = post_data.status;
+
+  connection.query(
+    "UPDATE tasks SET task =?, updated_at = NOW() WHERE id =?",
+    [task, status, id],
+    (err, rows) => {
+      if (!err) {
+        if (!err) {
+          res.json(
+            functions.response(
+              "Sucesso",
+              "Task atualizada",
+              rows.affectedRows,
+              null
+            )
+          );
+        } else {
+          res.json(
+            functions.response(
+              "Atenção",
+              "Task não encontrada",
+              rows.affectedRows,
+              null
+            )
+          );
+        }
       } else {
         res.json(functions.response("Erro", err.message, 0, null));
       }
