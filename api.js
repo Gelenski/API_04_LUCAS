@@ -32,72 +32,78 @@ app.use((req, res, next) => {
 const connection = mysql.createConnection(mysql_config);
 
 app.use(cors());
-
-app.use(json());
-
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-/*  * Interpretação de dados enviados por POST, sem esses métodos o middleware não buscaria os parâmetros*/
 
 // * Rotas
 app.get("/", (req, res) => {
   res.json(functions.response("Sucesso", "API está rodando.", 0, null));
 });
 
-app.get("/tasks", (req, res) => [
-  connection.query("SELECT * FROM tasks", (err, rows) => {}),
-]);
+app.get("/tasks", (req, res) => {
+  connection.query("SELECT * FROM tasks", (err, rows) => {
+    if (err) {
+      return res.json(functions.response("Erro", err.message, 0, null));
+    }
+    res.json(
+      functions.response(
+        "Sucesso",
+        "Tasks retrieved successfully.",
+        rows.length,
+        rows
+      )
+    );
+  });
+});
 
 app.get("/tasks/:id", (req, res) => {
   const id = req.params.id;
-  connection.query("SELECT * FROM tasks WHERE id=?"[id], (req, res) => {
-    if (!err) {
-      if (rows.length > 0) {
-        res.json(
-          functions.response(
-            "Sucesso",
-            "Sucesso na pesquisa",
-            rows.length,
-            rows
-          )
-        );
-      } else {
-        res.json(
-          functions.response(
-            "Atenção",
-            "Não foi possível encontrar a task solicitada",
-            0,
-            null
-          )
-        );
-      }
+  connection.query("SELECT * FROM tasks WHERE id=?", [id], (err, rows) => {
+    if (err) {
+      return res.json(functions.response("Erro", err.message, 0, null));
+    }
+    if (rows.length > 0) {
+      res.json(
+        functions.response(
+          "Sucesso",
+          "Task retrieved successfully.",
+          rows.length,
+          rows
+        )
+      );
     } else {
-      res.json(functions.response("error", err.message, 0, null));
+      res.json(
+        functions.response(
+          "Atenção",
+          "Não foi possível encontrar a task solicitada",
+          0,
+          null
+        )
+      );
     }
   });
 });
 
 app.put("/tasks/:id/status/:status", (req, res) => {
-  const id = req.params.id;
-  const status = req.params.status;
+  const { id, status } = req.params;
   connection.query(
-    "UPDATE tasks SET status =? WHERE id =?",
+    "UPDATE tasks SET status = ? WHERE id = ?",
     [status, id],
-    (err, rows) => {
-      if (!err) {
-        if (rows.affectedRows > 0) {
-          res.json(
-            functions.response(
-              "Sucesso",
-              "Sucesso na alteração do status",
-              rows.affectedRows,
-              null
-            )
-          );
-        } else {
-          res.json(
-            functions.response("Atenção", "Task não encontrada", 0, null)
-          );
-        }
+    (err, result) => {
+      if (err) {
+        return res.json(functions.response("Erro", err.message, 0, null));
+      }
+      if (result.affectedRows > 0) {
+        res.json(
+          functions.response(
+            "Sucesso",
+            "Status atualizado com sucesso.",
+            result.affectedRows,
+            null
+          )
+        );
+      } else {
+        res.json(functions.response("Atenção", "Task não encontrada", 0, null));
       }
     }
   );
@@ -105,100 +111,80 @@ app.put("/tasks/:id/status/:status", (req, res) => {
 
 app.delete("/tasks/:id/delete", (req, res) => {
   const id = req.params.id;
-  connection.query("DELETE tasks WHERE id =?", [id], (err, rows) => {
-    if (!err) {
-      if (rows.affectedRows > 0) {
-        res.json(
-          functions.response(
-            "Sucesso",
-            "Task deletada",
-            rows.affectedRows,
-            null
-          )
-        );
-      } else {
-        res.json(functions.response("Atenção", "Task não encontrada", 0, null));
-      }
+  connection.query("DELETE FROM tasks WHERE id = ?", [id], (err, result) => {
+    if (err) {
+      return res.json(functions.response("Erro", err.message, 0, null));
+    }
+    if (result.affectedRows > 0) {
+      res.json(
+        functions.response(
+          "Sucesso",
+          "Task deletada com sucesso.",
+          result.affectedRows,
+          null
+        )
+      );
     } else {
-      res.json(functions.response("Erro", err.message, 0, null));
+      res.json(functions.response("Atenção", "Task não encontrada", 0, null));
     }
   });
 });
 
-app.put("/tasks/create", (req, res) => {
-  const post_data = req.body;
-  if (post_data == undefined) {
-    res.json(
+app.post("/tasks/create", (req, res) => {
+  const { task, status } = req.body;
+  if (!task || !status) {
+    return res.json(
       functions.response("Atenção", "Sem dados de uma nova task", 0, null)
     );
-    return;
   }
 
-  const task = post_data.task;
-  const status = post_data.status;
-
   connection.query(
-    "INSERT INTO tasks(task, status, created_at, updated_at) VALUES (?, ?, NOW(), NOW()",
+    "INSERT INTO tasks(task, status, created_at, updated_at) VALUES (?, ?, NOW(), NOW())",
     [task, status],
-    (err, rows) => {
-      if (!err) {
-        res.json(
-          "Sucesso",
-          "Task cadastrada com sucesso",
-          rows.affectedRows,
-          null
-        );
-      } else {
-        res.json(functions.response("Erro", err.message, 0, null));
+    (err, result) => {
+      if (err) {
+        return res.json(functions.response("Erro", err.message, 0, null));
       }
+      res.json(
+        functions.response(
+          "Sucesso",
+          "Task cadastrada com sucesso.",
+          result.affectedRows,
+          null
+        )
+      );
     }
   );
 });
 
 app.put("/tasks/:id/update", (req, res) => {
   const id = req.params.id;
-  const post_data = req.body;
+  const { task, status } = req.body;
 
-  if (post_data == undefined) {
-    res.json(
-      functions.response("Atenção", "Sem dados para uma nova task", 0, null)
-    );
-    return;
+  if (!task || status === undefined) {
+    return res.json(functions.response("Atenção", "Dados inválidos.", 0, null));
   }
-  if (post_data == undefined || post_data.status == undefined) {
-    res.json(functions.response("Atenção", "Dados Inválidos", 0, null));
-    return;
-  }
-
-  const task = post_data.task;
-  const status = post_data.status;
 
   connection.query(
-    "UPDATE tasks SET task =?, updated_at = NOW() WHERE id =?",
+    "UPDATE tasks SET task = ?, status = ?, updated_at = NOW() WHERE id = ?",
     [task, status, id],
-    (err, rows) => {
-      if (!err) {
-        if (!err) {
-          res.json(
-            functions.response(
-              "Sucesso",
-              "Task atualizada",
-              rows.affectedRows,
-              null
-            )
-          );
-        } else {
-          res.json(
-            functions.response(
-              "Atenção",
-              "Task não encontrada",
-              rows.affectedRows,
-              null
-            )
-          );
-        }
+    (err, result) => {
+      if (err) {
+        return res.json(functions.response("Erro", err.message, 0, null));
+      }
+      if (result.affectedRows > 0) {
+        res.json(
+          functions.response(
+            "Sucesso",
+            "Task atualizada.",
+            result.affectedRows,
+            null
+          )
+        );
       } else {
-        res.json(functions.response("Erro", err.message, 0, null));
+        res.json(
+          functions.response("Atenção", "Task não encontrada.", 0, null)
+        );
       }
     }
   );
@@ -206,5 +192,7 @@ app.put("/tasks/:id/update", (req, res) => {
 
 // * Middleware
 app.use((req, res) => {
-  res.json(functions.response("Atenção", "Rota não encontrada.", 0, null));
+  res
+    .status(404)
+    .json(functions.response("Atenção", "Rota não encontrada.", 0, null));
 });
